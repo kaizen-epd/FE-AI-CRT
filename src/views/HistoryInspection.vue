@@ -45,12 +45,12 @@
             <strong>History Inspeksi</strong>
           </CCardHeader>
           <CCardBody>
-            <CRow class="mb-3">
+            <!-- <CRow class="mb-3">
                <CCol :sm="2">
                 <CFormLabel style="font-weight: bold;">Download</CFormLabel>
                 <CButton :disabled="loading" style="width: 100%; font-weight: bold; color: white" color="success" @click="downloadExcel">Download</CButton>
               </CCol>
-            </CRow>
+            </CRow> -->
             <hr/>
             <div v-if="loading && items.length === 0" class="text-center">
               <CSpinner color="primary" />
@@ -104,6 +104,106 @@
         </CCard>
       </CCol>
     </CRow>
+
+    <!-- Details Modal -->
+    <CModal :visible="isModalVisible" @close="() => { isModalVisible = false }" size="lg">
+      <CModalHeader>
+        <CModalTitle>Detail Inspeksi</CModalTitle>
+      </CModalHeader>
+      <CModalBody v-if="selectedItem">
+        <!-- Placeholder for Inspection Image -->
+        <div class="text-center mb-4">
+          <img src="https://via.placeholder.com/600x400.png?text=Inspection+Image" alt="Inspection Image" class="img-fluid rounded" />
+        </div>
+
+        <!-- Basic Info -->
+        <CRow>
+          <CCol :sm="6">
+            <dl>
+              <dt>Inspection ID</dt>
+              <dd>{{ selectedItem.inspection_id }}</dd>
+
+              <dt>Engine Number</dt>
+              <dd>{{ selectedItem.engine_number }}</dd>
+              
+            </dl>
+          </CCol>
+          <CCol :sm="6">
+            <dl>
+              <dt>Waktu Inspeksi</dt>
+              <dd>{{ formatDate(selectedItem.created_at) }}</dd>
+
+              <dt>Judge ID</dt>
+              <dd>{{ selectedItem.judge_id }}</dd>
+              
+            </dl>
+          </CCol>
+        </CRow>
+        
+        <!-- Notes -->
+        <hr/>
+        <h6>Catatan Keseluruhan</h6>
+        <p>{{ selectedItem.notes || 'Tidak ada catatan.' }}</p>
+
+        <!-- Part Inspections Details -->
+        <div v-if="selectedItem.part_inspections && selectedItem.part_inspections.length > 0">
+          <hr/>
+          <h6>Detail Inspeksi Bagian</h6>
+          <CTable responsive bordered>
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell>Gambar</CTableHeaderCell>
+                <CTableHeaderCell>Nama Bagian</CTableHeaderCell>
+                <CTableHeaderCell>Status</CTableHeaderCell>
+                <CTableHeaderCell>Catatan Bagian</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              <CTableRow v-for="part in selectedItem.part_inspections" :key="part.part_name">
+                <CTableDataCell>
+                  <img :src="part.part_image_url" alt="Part Image" style="width: 100px; height: auto; border-radius: 5px;" />
+                </CTableDataCell>
+                <CTableDataCell>{{ part.part_name }}</CTableDataCell>
+                <CTableDataCell>{{ part.part_status }}</CTableDataCell>
+                <CTableDataCell>{{ part.part_notes }}</CTableDataCell>
+              </CTableRow>
+            </CTableBody>
+          </CTable>
+        </div>
+
+        <!-- Harigami Details -->
+        <div>
+          <hr/>
+          <h6>Detail Harigami</h6>
+          <CTable responsive bordered>
+            <CTableHead>
+              <CTableRow>
+                <CTableHeaderCell>Inspection ID</CTableHeaderCell>
+                <CTableHeaderCell>Check ID</CTableHeaderCell>
+                <CTableHeaderCell>Actual Condition</CTableHeaderCell>
+                <CTableHeaderCell>Ideal Condition</CTableHeaderCell>
+                <CTableHeaderCell>Created At</CTableHeaderCell>
+                <CTableHeaderCell>Judge ID</CTableHeaderCell>
+              </CTableRow>
+            </CTableHead>
+            <CTableBody>
+              <CTableRow v-for="item in harigamiData" :key="item.uuid">
+                <CTableDataCell>{{ item.inspection_id }}</CTableDataCell>
+                <CTableDataCell>{{ item.check_id }}</CTableDataCell>
+                <CTableDataCell>{{ item.actual_condition }}</CTableDataCell>
+                <CTableDataCell>{{ item.ideal_condition }}</CTableDataCell>
+                <CTableDataCell>{{ formatDate(item.created_at) }}</CTableDataCell>
+                <CTableDataCell>{{ item.judge_id }}</CTableDataCell>
+              </CTableRow>
+            </CTableBody>
+          </CTable>
+        </div>
+
+      </CModalBody>
+      <CModalFooter>
+        <CButton color="secondary" @click="() => { isModalVisible = false }">Tutup</CButton>
+      </CModalFooter>
+    </CModal>
   </div>
 </template>
 
@@ -112,9 +212,11 @@ import {
   CRow, CCol, CButton, CFormLabel, CFormInput,
   CCard, CCardBody, CCardHeader, CTable, CTableHead,
   CTableBody, CTableRow, CTableHeaderCell, CTableDataCell,
-  CAlert, CSpinner, CBadge, CPagination, CPaginationItem
+  CAlert, CSpinner, CBadge, CPagination, CPaginationItem,
+  CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
 } from '@coreui/vue';
 import axios from 'axios';
+import harigamiData from '../../../template-BE/src/data/harigami.json';
 
 export default {
   name: 'HistoryInspection',
@@ -122,7 +224,8 @@ export default {
     CRow, CCol, CButton, CFormLabel, CFormInput,
     CCard, CCardBody, CCardHeader, CTable, CTableHead,
     CTableBody, CTableRow, CTableHeaderCell, CTableDataCell,
-    CAlert, CSpinner, CBadge, CPagination, CPaginationItem
+    CAlert, CSpinner, CBadge, CPagination, CPaginationItem,
+    CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
   },
   data() {
     return {
@@ -140,6 +243,9 @@ export default {
       },
       loading: false,
       error: null,
+      isModalVisible: false,
+      selectedItem: null,
+      harigamiData: harigamiData,
     };
   },
   computed: {
@@ -215,7 +321,16 @@ export default {
       return new Date(dateString).toLocaleDateString('id-ID', options);
     },
     viewDetails(item) {
-      alert(`Melihat detail untuk Inspection ID: ${item.inspection_id}`);
+      this.selectedItem = item;
+      this.isModalVisible = true;
+    },
+    getStatusColor(status) {
+      switch (status) {
+        case 'Selesai': return 'success';
+        case 'Perlu Perbaikan': return 'warning';
+        case 'Gagal': return 'danger';
+        default: return 'secondary';
+      }
     },
     downloadExcel() {
        alert('Fungsi download Excel akan diimplementasikan.');

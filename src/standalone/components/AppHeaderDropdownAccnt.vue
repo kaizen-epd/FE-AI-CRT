@@ -3,16 +3,14 @@
     <CDropdownToggle placement="bottom-end" class="py-0" href="javascript:void(0);">
       {{ userName }}&ensp;
       <img v-if="photo" :src="photo" class="rounded-circle" style="width: 36px; height: 36px;" />
-      <CAvatar v-else color="danger" text-color="white">{{ initials }}
+      <CAvatar v-else color="info" text-color="white">{{ initials }}
       </CAvatar>
     </CDropdownToggle>
+
     <CDropdownMenu class="pt-0 mt-2">
       <CDropdownHeader component="h6" class="fw-semibold py-2 mt-2 mb-2">
         Account
       </CDropdownHeader>
-      <CDropdownItem href="/#/sc/profile">
-        <CIcon icon="cil-user" /> Profile
-      </CDropdownItem>
       <CDropdownDivider />
       <CDropdownItem href="#" @click="logout()">
         <CIcon icon="cilAccountLogout" /> Logout
@@ -64,6 +62,7 @@ export default {
     }
   }
 }
+
 </script>
 
 <style>

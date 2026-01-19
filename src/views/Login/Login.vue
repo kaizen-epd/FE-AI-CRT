@@ -11,14 +11,14 @@
 
           <form @submit.prevent="onLogin">
             <div class="mb-3">
-              <label for="noreg" class="form-label ms-3">Noreg</label>
+              <label for="username" class="form-label ms-3">Username</label>
               <div class="input-wrapper">
                 <input
-                  v-model="noreg"
+                  v-model="username"
                   type="text"
                   class="form-control ms-3"
-                  id="noreg"
-                  placeholder="Enter your noreg"
+                  id="username"
+                  placeholder="Enter your username"
                   required
                 />
               </div>  
@@ -36,7 +36,6 @@
                   required
                 />
               </div>
-              <label style="font-size: xx-small;" class="ms-3">(Pass 4 digit awal nomor hp yang terdaftar)</label>
             </div>
 
             <button
@@ -51,17 +50,9 @@
               <span v-else>Login</span>
             </button>
           </form>
-
-          <div class="text-center mt-3 ms-4">
-            <span>Don't have an account?</span>
-            <a 
-              href="./#/auth/register/" 
-              class="register-link ms-1"
-            >Register</a>
-          </div>
         </div>
 
-        <div v-if="showElements" class="image-side">
+        <div class="image-side">
            <div class="image-wrapper">
             <img 
               :src="loginPhoto" 
@@ -86,74 +77,48 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import loginPhoto from '@/assets/images/plant_1.jpg';
-import api from '@/apis/CommonAPI'
+
+const router = useRouter()
 const password = ref('')
 const isLoading = ref(false)
 const error = ref('')
-const noreg = ref('')
+const username = ref('')
 const success = ref('')
-const showElements = ref(true)
 
-const fetchFrontendFlag = async () => {
-  try {
-    const response = await api.get('/smartandon/frontend')
-    const data = response.data
-    if (data && Array.isArray(data) && data.length > 0 && data[0].frontend === 1) {
-      showElements.value = false
-    } else {
-      showElements.value = true
-    }
-  } catch (e) {
-    console.error('Error fetching frontend flag:', e)
-    showElements.value = true
-  }
-}
-
-onMounted(() => {
-  fetchFrontendFlag()
-})
-
-const onLogin = async () => {
+const onLogin = () => {
   error.value = ''
   success.value = ''
 
-  if (!noreg.value || !password.value) {
+  if (!username.value || !password.value) {
     error.value = 'Please fill all fields.'
     return
   }
 
   isLoading.value = true
 
-  try {
-    const response = await api.post('/auth/login', {
-      noreg: noreg.value,
-      password: password.value,
-    })
-    if (response?.status === 200) {
-        success.value = 'Login successful!'
-        setTimeout(() => {
-          success.value = ''
-          window.location.href = '/#/app/RobotInspection'
-        }, 3000)
-        const data = response.data
-        console.log('Login data:', data)
-        localStorage.setItem('token', data.token)
-        noreg.value = ''
-        password.value = ''
+  // Simulate a short delay for UX
+  setTimeout(() => {
+    if (username.value === 'user' && password.value === 'user') {
+      success.value = 'Login successful!'
+      // Use a dummy token for testing purposes
+      localStorage.setItem('token', 'hardcoded-token-for-dev')
+      username.value = ''
+      password.value = ''
+      setTimeout(() => {
+        success.value = ''
+        router.push('/app/RobotInspection')
+      }, 1500)
     } else {
-      throw new Error(response?.response?.data?.message || 'Login failed. Please try again.')
+      error.value = 'Invalid username or password.'
+      setTimeout(() => {
+        error.value = ''
+      }, 3000)
     }
-  } catch (e) {
-    error.value = e.message || 'Login failed. Please try again.'
-    console.error('Login error:', e)
-    setTimeout(() => {
-      error.value = ''
-    }, 3000)
-  } finally {
     isLoading.value = false
-  }
+  }, 500)
 }
 </script>
 

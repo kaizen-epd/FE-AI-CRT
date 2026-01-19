@@ -80,6 +80,19 @@ const appRoutes = [
       title: 'History Inspection',
     },
   },
+
+  {
+    path: '/app/TestModel',
+    name: 'Test Model',
+    component: () =>
+      import(
+        /* webpackChunkName: "reports" */ '@/views/TestModel.vue'
+      ),
+    meta: {
+      requiresAuth: true,
+      title: 'Test Model',
+    },
+  },
 ]
 
 const authRoutes = [
@@ -133,13 +146,7 @@ const routes = [
     path: '/',
     name: 'Home',
     component: isStandalone ? DefaultLayoutStandAlone : DefaultLayout,
-    redirect: () => {
-      if (!isStandalone && (!localStorage.token || localStorage.token === '')) {
-        window.location.href = process.env.dc + '/#/auth/login'
-        return
-      }
-      return '/app/dashboard'
-    },
+    redirect: '/app/RobotInspection',
     children: [...appRoutes],
   },
   ...authRoutes,
@@ -170,9 +177,10 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // Update document title
   if (to.meta.title) {
-    document.title = `Smartandon - ${to.meta.title}`
+    document.title = `Robot Inspection - ${to.meta.title}`
   }
 
+  /*
   const token = localStorage.token
   const isLoggedIn = !!token && token !== '' && !isTokenExpired(token)
   if (token && isTokenExpired(token)) {
@@ -188,6 +196,7 @@ router.beforeEach((to, from, next) => {
     next({ name: 'Dashboard' })
     return
   }
+  */
   next()
 })
 

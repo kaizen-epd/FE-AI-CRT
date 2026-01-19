@@ -1,0 +1,42 @@
+[
+  {
+    "image_id": 1,
+    "uuid": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+    "inspection_id": "TCC_20240119_001",
+    "position_id": "TCC",
+    "image_path": "C:\\Users\\KhalRFY\\Documents\\RobotInspection\\template-BE\\upload\\0cf0c7241183b14d33243b7470cc6f60.jpg",
+    "created_at": "2026-01-19T10:00:00Z"
+  },
+  {
+    "image_id": 2,
+    "uuid": "b1c2d3e4-f5a6-4b5c-8d9e-1f2a3b4c5d6e",
+    "inspection_id": "Hole_Mounting_20240119_002",
+    "position_id": "Hole_Mounting",
+    "image_path": "C:\\Users\\KhalRFY\\Documents\\RobotInspection\\template-BE\\upload\\0e4fb5ace105f2f64a77236ae3529cae.jpg",
+    "created_at": "2026-01-19T10:05:00Z"
+  },
+  {
+    "image_id": 3,
+    "uuid": "c1d2e3f4-a5b6-4c5d-8e9f-2a3b4c5d6e7f",
+    "inspection_id": "Stample_Indikasi_tester_20240119_003",
+    "position_id": "Stample_Indikasi_tester",
+    "image_path": "C:\\Users\\KhalRFY\\Documents\\RobotInspection\\template-BE\\upload\\5c2b59102903074228a0c81e1de8b0e4.jpg",
+    "created_at": "2026-01-19T10:10:00Z"
+  },
+  {
+    "image_id": 4,
+    "uuid": "d1e2f3a4-b5c6-4d5e-8f9a-3b4c5d6e7f8g",
+    "inspection_id": "Stample_OK_Test_Bench_20240119_004",
+    "position_id": "Stample_OK_Test_Bench",
+    "image_path": "C:\\Users\\KhalRFY\\Documents\\RobotInspection\\template-BE\\upload\\b582d88c35f4f531cdb7b3302a9e6991.jpg",
+    "created_at": "2026-01-19T10:15:00Z"
+  },
+  {
+    "image_id": 5,
+    "uuid": "e1f2a3b4-c5d6-4e5f-8a9b-4c5d6e7f8g9h",
+    "inspection_id": "Sticker_Engine_20240119_005",
+    "position_id": "Sticker_Engine",
+    "image_path": "C:\\Users\\KhalRFY\\Documents\\RobotInspection\\template-BE\\upload\\cca9352071164ef4fd3c1ea29c4d4c6a.jpg",
+    "created_at": "2026-01-19T10:20:00Z"
+  }
+]
