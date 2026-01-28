@@ -1,7 +1,6 @@
 <template>
   <CChartRadar :data="defaultData" />
 </template>
-
 <script>
 import { CChartRadar } from '@coreui/vue-chartjs'
 export default {

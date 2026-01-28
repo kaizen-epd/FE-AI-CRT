@@ -3,7 +3,7 @@
     <CCol md="8">
       <CCard class="mb-4">
         <CCardHeader>
-          <strong>Live Stream</strong>
+          <Label>Live Stream</Label>
         </CCardHeader>
         <CCardBody>
           <p>Streaming from: <code>{{ streamUrl }}</code></p>
@@ -17,7 +17,7 @@
     <CCol md="4">
       <CCard>
         <CCardHeader>
-          <strong>Stream Parameters</strong>
+          <Label>Stream Parameters</Label>
         </CCardHeader>
         <CCardBody>
           <CForm>

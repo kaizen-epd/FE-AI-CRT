@@ -1,7 +1,6 @@
 <template>
   <CChartPolarArea :data="defaultData" />
 </template>
-
 <script>
 import { CChartPolarArea } from '@coreui/vue-chartjs'
 export default {

@@ -1,5 +1,4 @@
 <template>
-  
   <CRow class="mb-3">
     <CCol>
       <CCard>
@@ -50,6 +49,20 @@
                 "
                 @click="openUploadModal"
               >+ Upload Inspection Media +</CButton>
+            </CCol>
+            <CCol>
+                <CButton
+                class="mb-3"
+                color="info"
+                size="lg"
+                style="
+                  font-size: medium;
+                  font-weight: bold;
+                  color: white;
+                  width: 100%;
+                "
+                @click="testBackendConnection"
+              >Test Backend Connection</CButton>
             </CCol>
           </CRow>
           <CRow>
@@ -450,6 +463,20 @@ export default {
 
 
   methods: {
+    async testBackendConnection() {
+      try {
+        const response = await api.get('/test/ping');
+        if (response.data && response.data.message) {
+          alert('✅ SUCCESS!\n\nResponse from backend: ' + response.data.message);
+        } else {
+          throw new Error('Invalid response format from backend.');
+        }
+      } catch (error) {
+        console.error('Backend connection test failed:', error);
+        alert('❌ FAILED!\n\nCould not get a valid response from the backend. See console for details.');
+      }
+    },
+
     async fetchCameras() {
       try {
         const response = await api.get('/camera/list');
@@ -507,24 +534,26 @@ export default {
     async fetchInspections() {
       this.loading = true;
       try {
-        const params = {};
-        if (this.selectedStatus && this.selectedStatus !== 'All') {
-          params.status = this.selectedStatus.toLowerCase();
-        }
-        if (this.selectedLine) {
-          params.line_id = this.selectedLine;
-        }
-        if (this.selectedMachine) {
-          params.machine_id = this.selectedMachine;
-        }
-        const response = await api.get('/robot-inspection', { params });
+        // Step 1: Connect to the new backend endpoint.
+        // Note: This endpoint does not support the old filtering parameters.
+        const response = await api.get('/item_check/get');
+
         if (response.status !== 200) {
-          throw new Error('Failed to fetch inspections, status: ' + response.status);
+          throw new Error(`Failed to fetch data from /item_check/get. Status: ${response.status}`);
         }
-        console.log('Response data:', response.data);
-        this.inspections = Array.isArray(response.data) ? response.data : [];
+
+        // Log the actual data received from the new backend to prove connection.
+        console.log('Successfully connected and received data from BE-AI-CRT:', response.data);
+        alert('Connection to the new backend is successful! Check the browser console (F12) to see the received data.');
+
+        // For now, the table will be empty because the data structure is incompatible.
+        // The next step is to adapt the frontend to use this new data structure.
+        this.inspections = [];
+
       } catch (error) {
-        console.error('Failed to fetch inspections:', error);
+        console.error('Error connecting to the new backend:', error);
+        alert('Failed to connect to the new backend. Please ensure it is running on port 5000 and check the browser console for errors.');
+        this.inspections = [];
       } finally {
         this.loading = false;
       }
@@ -736,7 +765,7 @@ export default {
     },
 
     getImageUrl(path) {
-      return `http://localhost:3000${path}`;
+      return `http://localhost:5000${path}`;
     },
   },
   async created() {

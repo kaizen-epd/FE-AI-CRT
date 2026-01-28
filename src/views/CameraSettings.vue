@@ -8,7 +8,7 @@
             <h5>Live Camera Feed</h5>
           </CCardHeader>
           <CCardBody class="p-0">
-            <video ref="videoPlayer" class="camera-feed" autoplay playsinline></video>
+            <img v-if="streamUrl" :src="streamUrl" class="camera-feed" alt="Camera Feed" />
             <div v-if="cameraError" class="alert alert-danger m-3">
               <strong>Error:</strong> {{ cameraError }}
             </div>
@@ -99,7 +99,7 @@
 
 <script>
 import { CRow, CCol, CCard, CCardHeader, CCardBody, CButton, CForm, CFormLabel, CFormSelect, CFormRange, CFormCheck } from '@coreui/vue';
-import axios from 'axios';
+import api from '../apis/CommonAPI';
 
 export default {
   name: 'CameraSettings',
@@ -123,15 +123,16 @@ export default {
       controls: [],
       originalControls: [], // To store default values for reset
       cameras: [],
+      rawCameras: [],
       selectedCamera: '',
       previousSelectedCamera: '',
-      allSettings: {},
       isDirty: false,
+      streamUrl: null,
     };
   },
   watch: {
     selectedCamera() {
-      this.fetchAllSettings();
+      this.loadCameraSettings();
     },
     controls: {
       handler() {
@@ -147,101 +148,86 @@ export default {
     async initializeCamera() {
       // Clean up any existing stream
       this.stopCameraStream();
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        this.cameraError = "Your browser does not support the MediaDevices API.";
-        return;
-      }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const videoPlayer = this.$refs.videoPlayer;
-        if (videoPlayer) {
-          videoPlayer.srcObject = stream;
-          videoPlayer.play();
-          this.cameraError = null;
-        }
-      } catch (err) {
-        console.error("Error accessing camera:", err);
-        if (err.name === 'NotAllowedError') {
-          this.cameraError = "Permission to use camera was denied. Please allow camera access in your browser settings.";
-        } else if (err.name === 'NotFoundError') {
-          this.cameraError = "No camera was found. Please ensure a camera is connected.";
-        } else {
-          this.cameraError = `Could not access the camera. Error: ${err.name}`;
-        }
-      }
+      // Menggunakan stream dari backend agar sesuai dengan kamera robot
+      // Tambahkan timestamp untuk mencegah caching browser saat refresh stream
+      // Tambahkan parameter index kamera yang dipilih
+      const camIndex = this.selectedCamera ? this.selectedCamera : 0;
+      this.streamUrl = `/camera/stream?index=${camIndex}&t=${new Date().getTime()}`;
+      this.cameraError = null;
     },
     stopCameraStream() {
-      const videoPlayer = this.$refs.videoPlayer;
-      if (videoPlayer && videoPlayer.srcObject) {
-        const stream = videoPlayer.srcObject;
-        const tracks = stream.getTracks();
-        tracks.forEach(track => track.stop());
-        videoPlayer.srcObject = null;
-      }
+      this.streamUrl = null;
     },
     async fetchCameraList() {
       try {
-        const response = await axios.get('/api/camera/list');
-        this.cameras = response.data;
+        const response = await api.get('/camData/get');
+        // Data dari getData_camera berupa list of dicts
+        const responseData = response.data;
+        console.log('Fetched Camera Controller Data:', responseData);
+        this.rawCameras = Array.isArray(responseData) ? responseData : [];
+
+        this.cameras = this.rawCameras.map(cam => ({
+          label: cam.cam_nm,
+          value: cam.cam_id
+        }));
+
         if (this.cameras.length > 0) {
-          this.selectedCamera = this.cameras[0];
-          this.previousSelectedCamera = this.cameras[0];
-          await this.fetchAllSettings();
+          // Set default jika belum ada yang dipilih atau pilihan saat ini tidak valid
+          if (!this.selectedCamera || !this.cameras.find(c => c.value == this.selectedCamera)) {
+            this.selectedCamera = this.cameras[0].value;
+            this.previousSelectedCamera = this.cameras[0].value;
+          }
         }
       } catch (error) {
         console.error('Error fetching camera list:', error);
+        this.cameraError = "Gagal mengambil daftar kamera.";
       }
     },
-    async fetchAllSettings() {
-        try {
-            const response = await axios.get('/api/camera/settings');
-            this.allSettings = response.data;
-            this.loadCameraSettings();
-        } catch (error) {
-            console.error('Error fetching all settings:', error);
-        }
-    },
     loadCameraSettings() {
-        const settings = this.allSettings[this.selectedCamera];
-        if (!settings) {
-            console.error('No settings found for camera:', this.selectedCamera);
-            this.controls = [];
-            this.originalControls = [];
-            return;
-        }
+        // Gunakan loose equality (==) untuk menangani ID string dari select vs int dari DB
+        const camera = this.rawCameras.find(c => c.cam_id == this.selectedCamera);
+        
+        if (!camera) return;
 
+        let settings = {};
+        if (camera && camera.config) {
+            // Parse jika config masih berupa string JSON, jika sudah object gunakan langsung
+            settings = typeof camera.config === 'string' ? JSON.parse(camera.config) : camera.config;
+        }
+        
         const cameraControlsData = [
-            { name: 'brightness', type: 'int', min: 0, max: 255, step: 1, default: 128, value: settings.brightness },
-            { name: 'contrast', type: 'int', min: 0, max: 255, step: 1, default: 128, value: settings.contrast },
-            { name: 'saturation', type: 'int', min: 0, max: 255, step: 1, default: 128, value: settings.saturation },
-            { name: 'white_balance_automatic', type: 'bool', default: true, value: settings.white_balance_automatic },
-            { name: 'gain', type: 'int', min: 0, max: 255, step: 1, default: 0, value: settings.gain },
-            { name: 'power_line_frequency', type: 'menu', min: 0, max: 2, default: 2, value: settings.power_line_frequency, options: [
+            { name: 'brightness', type: 'int', min: 0, max: 255, step: 1, default: 128 },
+            { name: 'contrast', type: 'int', min: 0, max: 255, step: 1, default: 128 },
+            { name: 'saturation', type: 'int', min: 0, max: 255, step: 1, default: 128 },
+            { name: 'white_balance_automatic', type: 'bool', default: true },
+            { name: 'gain', type: 'int', min: 0, max: 255, step: 1, default: 0 },
+            { name: 'power_line_frequency', type: 'menu', min: 0, max: 2, default: 2, options: [
                 { value: 0, label: 'Disabled' },
                 { value: 1, label: '50 Hz' },
                 { value: 2, label: '60 Hz' },
             ]},
-            { name: 'white_balance_temperature', type: 'int', min: 2000, max: 7500, step: 10, default: 4000, value: settings.white_balance_temperature, flags: 'inactive' },
-            { name: 'sharpness', type: 'int', min: 0, max: 255, step: 1, default: 128, value: settings.sharpness },
-            { name: 'backlight_compensation', type: 'int', min: 0, max: 1, step: 1, default: 1, value: settings.backlight_compensation },
-            { name: 'auto_exposure', type: 'menu', min: 0, max: 3, default: 3, value: settings.auto_exposure, options: [
+            { name: 'white_balance_temperature', type: 'int', min: 2000, max: 7500, step: 10, default: 4000, flags: 'inactive' },
+            { name: 'sharpness', type: 'int', min: 0, max: 255, step: 1, default: 128 },
+            { name: 'backlight_compensation', type: 'int', min: 0, max: 1, step: 1, default: 1 },
+            { name: 'auto_exposure', type: 'menu', min: 0, max: 3, default: 3, options: [
                 { value: 0, label: 'Manual Mode' },
                 { value: 1, label: 'Auto Mode' },
                 { value: 2, label: 'Shutter Priority Mode' },
                 { value: 3, label: 'Aperture Priority Mode' },
             ]},
-            { name: 'exposure_time_absolute', type: 'int', min: 3, max: 2047, step: 1, default: 250, value: settings.exposure_time_absolute, flags: 'inactive' },
-            { name: 'exposure_dynamic_framerate', type: 'bool', default: false, value: settings.exposure_dynamic_framerate },
-            { name: 'pan_absolute', type: 'int', min: -36000, max: 36000, step: 3600, default: 0, value: settings.pan_absolute },
-            { name: 'tilt_absolute', type: 'int', min: -36000, max: 36000, step: 3600, default: 0, value: settings.tilt_absolute },
-            { name: 'focus_absolute', type: 'int', min: 0, max: 255, step: 5, default: 0, value: settings.focus_absolute, flags: 'inactive' },
-            { name: 'focus_automatic_continuous', type: 'bool', default: true, value: settings.focus_automatic_continuous },
-            { name: 'zoom_absolute', type: 'int', min: 100, max: 500, step: 1, default: 100, value: settings.zoom_absolute },
+            { name: 'exposure_time_absolute', type: 'int', min: 3, max: 2047, step: 1, default: 250, flags: 'inactive' },
+            { name: 'exposure_dynamic_framerate', type: 'bool', default: false },
+            { name: 'pan_absolute', type: 'int', min: -36000, max: 36000, step: 3600, default: 0 },
+            { name: 'tilt_absolute', type: 'int', min: -36000, max: 36000, step: 3600, default: 0 },
+            { name: 'focus_absolute', type: 'int', min: 0, max: 255, step: 5, default: 0, flags: 'inactive' },
+            { name: 'focus_automatic_continuous', type: 'bool', default: true },
+            { name: 'zoom_absolute', type: 'int', min: 100, max: 500, step: 1, default: 100 },
       ];
 
       const processedControls = cameraControlsData.map(control => {
+        const settingValue = settings[control.name];
+        control.value = settingValue !== undefined ? settingValue : control.default;
+
         if (control.type === 'bool') {
           control.value = !!control.value;
           control.default = !!control.default;
@@ -266,7 +252,6 @@ export default {
     },
     async saveSettings() {
         const cameraToSave = this.selectedCamera;
-        console.log('Saving settings...');
         const settingsToSave = this.controls.reduce((acc, control) => {
             if (control.type === 'int' || control.type === 'menu') {
               acc[control.name] = Number(control.value);
@@ -275,33 +260,29 @@ export default {
             }
             return acc;
         }, {});
-        console.log('Settings to save:', settingsToSave);
 
         try {
-            await axios.post('/api/camera/settings', {
-                camera: cameraToSave,
-                settings: settingsToSave,
+            await api.put('/camData/update', {
+                cam_id: cameraToSave,
+                config: settingsToSave,
             });
-            // Swal.fire('Saved!', 'Your settings have been saved.', 'success');
-            await this.fetchAllSettings(); // Refresh settings
+            await this.fetchCameraList(); // Refresh settings
             this.isDirty = false;
             this.isEditing = false;
         } catch (error) {
             console.error('Error saving settings:', error);
-            // Swal.fire('Error!', 'Failed to save settings.', 'error');
+            this.cameraError = 'Gagal menyimpan pengaturan.';
         }
     },
     resetToDefaults() {
-      console.log('Resetting controls to default values.');
       this.controls = JSON.parse(JSON.stringify(this.originalControls));
       this.isDirty = false;
       this.isEditing = false;
     },
     handleCameraChange() {
-      console.log('Camera changed to:', this.selectedCamera);
       this.previousSelectedCamera = this.selectedCamera;
-      this.loadCameraSettings();
       this.isEditing = false;
+      this.initializeCamera(); // Restart stream saat kamera berubah
     },
   },
   mounted() {

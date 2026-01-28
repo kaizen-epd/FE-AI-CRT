@@ -26,7 +26,7 @@
                 <CButton :disabled="loading" style="width: 100%" color="dark" variant="outline" @click="resetFilters">Reset</CButton>
               </CCol>
               <CCol :sm="10">
-                <CButton :disabled="loading" style="width: 100%" color="primary" @click="fetchHistory(1)">
+                <CButton :disabled="loading" style="width: 100%" color="primary" @click="search">
                    <CSpinner component="span" size="sm" v-if="loading" />
                   Search
                 </CButton>
@@ -175,7 +175,14 @@
         <div>
           <hr/>
           <h6>Detail Harigami</h6>
-          <CTable responsive bordered>
+          <div v-if="detailLoading" class="text-center">
+            <CSpinner color="primary" />
+            <p>Loading details...</p>
+          </div>
+          <CAlert color="info" v-else-if="!harigamiData || harigamiData.length === 0" class="text-center">
+            Tidak ada data detail harigami yang ditemukan.
+          </CAlert>
+          <CTable v-else responsive bordered>
             <CTableHead>
               <CTableRow>
                 <CTableHeaderCell>Inspection ID</CTableHeaderCell>
@@ -187,7 +194,7 @@
               </CTableRow>
             </CTableHead>
             <CTableBody>
-              <CTableRow v-for="item in harigamiData" :key="item.uuid">
+              <CTableRow v-for="item in harigamiData" :key="item.check_id">
                 <CTableDataCell>{{ item.inspection_id }}</CTableDataCell>
                 <CTableDataCell>{{ item.check_id }}</CTableDataCell>
                 <CTableDataCell>{{ item.actual_condition }}</CTableDataCell>
@@ -216,7 +223,6 @@ import {
   CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
 } from '@coreui/vue';
 import axios from 'axios';
-import harigamiData from '../../../template-BE/src/data/harigami.json';
 
 export default {
   name: 'HistoryInspection',
@@ -229,7 +235,8 @@ export default {
   },
   data() {
     return {
-      items: [],
+      allItems: [], // Holds all history items from the API
+      items: [], // Holds items for the currently displayed page
       filters: {
         startDate: '',
         finishDate: '',
@@ -242,13 +249,39 @@ export default {
         totalRecords: 0,
       },
       loading: false,
+      detailLoading: false,
       error: null,
       isModalVisible: false,
       selectedItem: null,
-      harigamiData: harigamiData,
+      harigamiData: [],
     };
   },
   computed: {
+    filteredItems() {
+      if (!this.allItems) return [];
+      let filtered = this.allItems;
+
+      // Engine Number Filter
+      if (this.filters.engineNumber) {
+        filtered = filtered.filter(item =>
+          item.engine_number && item.engine_number.toLowerCase().includes(this.filters.engineNumber.toLowerCase())
+        );
+      }
+
+      // Date Filter
+      if (this.filters.startDate) {
+         const start = new Date(this.filters.startDate);
+         start.setHours(0, 0, 0, 0);
+         filtered = filtered.filter(item => new Date(item.created_at_orig) >= start);
+      }
+      if (this.filters.finishDate) {
+        const end = new Date(this.filters.finishDate);
+        end.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(item => new Date(item.created_at_orig) <= end);
+      }
+
+      return filtered;
+    },
     visiblePages() {
       const total = this.pagination.totalPages;
       const current = this.pagination.currentPage;
@@ -265,75 +298,100 @@ export default {
       return Array.from({ length: end - start + 1 }, (_, i) => start + i);
     },
   },
+  watch: {
+    // Watch for changes in filteredItems to automatically update pagination
+    filteredItems() {
+      this.updatePagination();
+      this.goToPage(1);
+    }
+  },
   mounted() {
     this.fetchHistory();
   },
   methods: {
-    async fetchHistory(page = 1) {
+    async fetchHistory() {
       this.loading = true;
       this.error = null;
       try {
-        const params = {
-          page,
-          limit: this.pagination.pageSize,
-          startDate: this.filters.startDate || undefined,
-          finishDate: this.filters.finishDate || undefined,
-          engineNumber: this.filters.engineNumber || undefined,
-        };
-        const response = await axios.get('/api/inspections/history', { params });
+        const response = await axios.get('/api/history_inspection/get');
         
-        if (response && response.data && Array.isArray(response.data.data)) {
-          this.items = response.data.data;
-          this.pagination.currentPage = response.data.page || 1;
-          this.pagination.totalRecords = response.data.total || 0;
-          this.pagination.totalPages = Math.ceil(this.pagination.totalRecords / this.pagination.pageSize) || 0;
+        if (response && response.data && Array.isArray(response.data)) {
+          // Map backend data and create a parseable date for filtering/sorting
+          this.allItems = response.data.map(item => {
+              const [datePart, timePart] = item.created_at.split(' ');
+              const [day, month, year] = datePart.split('-');
+              return {
+                  ...item,
+                  created_at_orig: `${year}-${month}-${day}T${timePart}:00`
+              };
+          });
         } else {
-          this.items = [];
-          this.pagination.currentPage = 1;
-          this.pagination.totalRecords = 0;
-          this.pagination.totalPages = 0;
+          this.allItems = [];
           console.warn('Received unexpected data structure from API:', response.data);
         }
 
       } catch (err) {
         this.error = 'Gagal memuat data riwayat inspeksi dari API.';
-        this.items = [];
-        this.pagination.totalPages = 0;
+        this.allItems = [];
         console.error(err);
       } finally {
         this.loading = false;
       }
     },
+    updatePagination() {
+        this.pagination.currentPage = 1;
+        this.pagination.totalRecords = this.filteredItems.length;
+        this.pagination.totalPages = Math.ceil(this.pagination.totalRecords / this.pagination.pageSize);
+    },
     resetFilters() {
       this.filters.startDate = '';
       this.filters.finishDate = '';
       this.filters.engineNumber = '';
-      this.fetchHistory(1);
     },
     goToPage(page) {
-      if (page >= 1 && page <= this.pagination.totalPages) {
-        this.fetchHistory(page);
+      if (page >= 1 && page <= this.pagination.totalPages || this.pagination.totalPages === 0) {
+        this.pagination.currentPage = page;
+        const start = (this.pagination.currentPage - 1) * this.pagination.pageSize;
+        const end = start + this.pagination.pageSize;
+        this.items = this.filteredItems.slice(start, end);
       }
     },
     formatDate(dateString) {
       if (!dateString) return 'N/A';
+      // Handles the 'DD-MM-YYYY HH:MI' format from backend
+      const [datePart, timePart] = dateString.split(' ');
+      const [day, month, year] = datePart.split('-');
+      const date = new Date(`${year}-${month}-${day}T${timePart || '00:00'}:00`);
       const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
-      return new Date(dateString).toLocaleDateString('id-ID', options);
+      return date.toLocaleDateString('id-ID', options);
     },
-    viewDetails(item) {
+    async viewDetails(item) {
       this.selectedItem = item;
       this.isModalVisible = true;
-    },
-    getStatusColor(status) {
-      switch (status) {
-        case 'Selesai': return 'success';
-        case 'Perlu Perbaikan': return 'warning';
-        case 'Gagal': return 'danger';
-        default: return 'secondary';
+      this.harigamiData = [];
+      this.detailLoading = true;
+      try {
+        const response = await axios.get(`/api/detail/get?id=${item.inspection_id}`);
+        if (response && response.data && Array.isArray(response.data)) {
+          this.harigamiData = response.data;
+        } else {
+          this.harigamiData = [];
+          console.warn('Received unexpected data structure from detail API:', response.data);
+        }
+      } catch (err) {
+        console.error('Gagal memuat detail inspeksi:', err);
+        this.harigamiData = [];
+      } finally {
+        this.detailLoading = false;
       }
     },
     downloadExcel() {
        alert('Fungsi download Excel akan diimplementasikan.');
+    },
+    // The "Search" button click is now handled by reactive computed properties.
+    // This method is kept for the @click handler to ensure search feels intentional.
+    search() {
+        this.goToPage(1);
     }
   },
 };

@@ -1,165 +1,183 @@
 <template>
-  <CContainer class="my-4">
-    <h1 class="text-center mb-4">Ambil Gambar Sampel (Dataset AI)</h1>
-
-    <CAlert color="danger" v-if="!isCameraSupported">
-      Fitur kamera tidak didukung di browser ini.
-    </CAlert>
-
-    <div v-if="isCameraSupported">
-      <CRow class="justify-content-center mb-3">
-        <CCol md="6">
-          <CFormLabel for="camera-select">Pilih Kamera:</CFormLabel>
-          <CFormSelect
-            id="camera-select"
-            v-model="selectedDeviceId"
-            @change="startCamera"
-            :options="cameraOptions"
-            :disabled="isAnyCaptureRunning"
-          />
-        </CCol>
-      </CRow>
-
-      <CRow class="justify-content-center mb-4">
-        <CCol lg="8" md="10">
-          <div class="camera-box">
-            <video ref="videoPlayer" class="camera-feed" autoplay playsinline></video>
-            <div v-if="!isCameraRunning" class="placeholder">
-              <span>Kamera tidak aktif</span>
-            </div>
-          </div>
-        </CCol>
-      </CRow>
-
+  <CCard>
+    <CCardBody>
       <CRow>
-        <!-- Manual Capture -->
-        <CCol md="4" class="mb-3">
-          <CCard class="h-100">
-            <CCardBody class="text-center d-flex flex-column">
-              <CCardTitle>Manual Capture</CCardTitle>
-              <CCardText class="flex-grow-1">Ambil gambar satu per satu.</CCardText>
-              <CButton color="primary" @click="takePicture" :disabled="!isCameraRunning || isAnyCaptureRunning">
-                <CIcon name="cil-camera" class="me-2" />
-                Ambil Gambar
-              </CButton>
-            </CCardBody>
-          </CCard>
-        </CCol>
+        <CCol>
 
-        <!-- Interval Capture -->
-        <CCol md="4" class="mb-3">
-          <CCard class="h-100">
-            <CCardBody class="text-center d-flex flex-column">
-              <CCardTitle>Interval Capture</CCardTitle>
-              <CCardText class="flex-grow-1">Ambil gambar tanpa batas sampai dihentikan.</CCardText>
-              <div class="mb-3">
-                <CFormLabel for="interval-time" class="d-inline me-2">Interval (detik):</CFormLabel>
-                <CFormInput id="interval-time" type="number" v-model.number="intervalTime" min="1" :disabled="isAnyCaptureRunning" style="max-width: 100px; display: inline-block;" />
-              </div>
-              <div class="mt-auto">
-                <CButton color="success" @click="startIntervalCapture" :disabled="!isCameraRunning || isAnyCaptureRunning" class="me-2" style="color: white;">
-                  Mulai
-                </CButton>
-                <CButton :color="isIntervalRunning ? 'danger' : 'dark'" @click="stopIntervalCapture" :disabled="!isIntervalRunning" style="color: white;">
-                  Hentikan
-                </CButton>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        <!-- Rapid Collect -->
-        <CCol md="4" class="mb-3">
-          <CCard class="h-100">
-            <CCardBody class="text-center d-flex flex-column">
-              <CCardTitle>Rapid Collect</CCardTitle>
-              <CCardText class="flex-grow-1">Ambil gambar dengan interval dan batas jumlah.</CCardText>
-              <CRow>
-                <CCol class="mb-3">
-                  <CFormLabel for="rapid-interval" class="d-inline me-2">Interval:</CFormLabel>
-                  <CFormInput id="rapid-interval" type="number" v-model.number="rapidCollectInterval" min="1" :disabled="isAnyCaptureRunning" style="max-width: 80px; display: inline-block;" />
-                </CCol>
-                <CCol class="mb-3">
-                  <CFormLabel for="rapid-limit" class="d-inline me-2">Batas:</CFormLabel>
-                  <CFormInput id="rapid-limit" type="number" v-model.number="rapidCollectLimit" min="1" :disabled="isAnyCaptureRunning" style="max-width: 80px; display: inline-block;" />
+          <CContainer class="my-4">
+            <h1 class="text-center mb-4">Ambil Gambar Sampel (Dataset AI)</h1>
+        
+            <div>
+              <CRow class="justify-content-center mb-3">
+                <CCol md="6">
+                  <CFormLabel for="camera-select">Pilih Kamera:</CFormLabel>
+                  <CFormSelect
+                    id="camera-select"
+                    v-model="selectedCamera"
+                    @change="handleCameraChange"
+                    :options="cameraOptions"
+                    :disabled="isAnyCaptureRunning"
+                  />
                 </CCol>
               </CRow>
-              <div class="mt-auto">
-                <CButton color="info" @click="startRapidCollect" :disabled="!isCameraRunning || isAnyCaptureRunning" style="color: white;">
-                  Mulai Rapid Collect
-                </CButton>
-              </div>
-            </CCardBody>
-          </CCard>
+        
+              <CRow class="justify-content-center mb-4">
+                <CCol lg="8" md="10">
+                  <div class="camera-box">
+                    <img v-if="streamUrl" :src="streamUrl" class="camera-feed" alt="Camera Feed" />
+                    <div v-else class="placeholder">
+                      <span>Kamera tidak aktif</span>
+                    </div>
+                  </div>
+                </CCol>
+              </CRow>
+        
+              <CRow class="justify-content-center mb-4">
+                <CCol md="12" class="text-center">
+                  <CButton color="primary" size="lg" class="m-2" @click="openCaptureModal">
+                    <CIcon name="cil-settings" class="me-2" /> Capture Menu {{ isAnyCaptureRunning ? '(Running)' : '' }}
+                  </CButton>
+                </CCol>
+              </CRow>
+            </div>
+        
+            <CCard v-if="capturedImages.length > 0" class="mt-4">
+              <CCardHeader>
+                <CRow class="align-items-center">
+                  <CCol>
+                    <strong>Galeri Gambar ({{ capturedImages.length }} gambar)</strong>
+                  </CCol>
+                  <CCol class="text-end">
+                    <CButton color="primary" size="sm" @click="openSaveModal" class="me-2">
+                      Save All
+                    </CButton>
+                    <CButton color="secondary" size="sm" @click="clearImages">
+                      Bersihkan Galeri
+                    </CButton>
+                  </CCol>
+                </CRow>
+              </CCardHeader>
+              <CCardBody>
+                <CRow class="image-gallery g-3">
+                  <CCol v-for="(image, index) in capturedImages" :key="index" xs="6" sm="4" md="3" lg="2">
+                    <div class="image-container">
+                      <img :src="image" alt="Gambar hasil tangkapan" class="captured-image" />
+                      <CButton color="danger" size="sm" class="delete-btn" @click="deleteImage(index)">
+                        <CIcon name="cil-trash" />
+                      </CButton>
+                    </div>
+                  </CCol>
+                </CRow>
+              </CCardBody>
+            </CCard>
+        
+            <canvas ref="canvasElement" style="display: none;"></canvas>
+        
+          </CContainer>
         </CCol>
       </CRow>
-    </div>
+    </CCardBody>
+  </CCard>
+  
+  <!-- Unified Capture Modal -->
+  <CModal :visible="isCaptureModalVisible" @close="closeCaptureModal" size="lg">
+    <CModalHeader>
+      <CModalTitle>Capture Options</CModalTitle>
+    </CModalHeader>
+    <CModalBody>
+      <CNav variant="tabs" role="tablist">
+        <CNavItem>
+          <CNavLink href="javascript:void(0);" :active="activeTab === 'manual'" @click="activeTab = 'manual'">
+            Manual
+          </CNavLink>
+        </CNavItem>
+        <CNavItem>
+          <CNavLink href="javascript:void(0);" :active="activeTab === 'interval'" @click="activeTab = 'interval'">
+            Interval {{ isIntervalRunning ? '(Running)' : '' }}
+          </CNavLink>
+        </CNavItem>
+        <CNavItem>
+          <CNavLink href="javascript:void(0);" :active="activeTab === 'rapid'" @click="activeTab = 'rapid'">
+            Rapid {{ isRapidCollecting ? '(Running)' : '' }}
+          </CNavLink>
+        </CNavItem>
+      </CNav>
+      <CTabContent class="p-4 border border-top-0 rounded-bottom text-center">
+        <CTabPane role="tabpanel" :visible="activeTab === 'manual'">
+          <p>Ambil gambar satu per satu.</p>
+          <CButton color="primary" @click="takePicture" :disabled="isAnyCaptureRunning">
+            <CIcon name="cil-camera" class="me-2" /> Ambil Gambar
+          </CButton>
+        </CTabPane>
+        <CTabPane role="tabpanel" :visible="activeTab === 'interval'">
+          <p>Ambil gambar tanpa batas sampai dihentikan.</p>
+          <div class="mb-3">
+            <CFormLabel for="interval-time" class="d-inline me-2">Interval (detik):</CFormLabel>
+            <CFormInput id="interval-time" type="number" v-model.number="intervalTime" min="1" :disabled="isAnyCaptureRunning" style="max-width: 100px; display: inline-block;" />
+          </div>
+          <CButton color="success" @click="startIntervalCapture" :disabled="isAnyCaptureRunning" class="me-2" style="color: white;">
+            Mulai
+          </CButton>
+          <CButton :color="isIntervalRunning ? 'danger' : 'dark'" @click="stopIntervalCapture" :disabled="!isIntervalRunning" style="color: white;">
+            Hentikan
+          </CButton>
+        </CTabPane>
+        <CTabPane role="tabpanel" :visible="activeTab === 'rapid'">
+          <p>Ambil gambar dengan interval dan batas jumlah.</p>
+          <div class="mb-3">
+            <CFormLabel for="rapid-interval" class="d-inline me-2">Interval:</CFormLabel>
+            <CFormInput id="rapid-interval" type="number" v-model.number="rapidCollectInterval" min="1" :disabled="isAnyCaptureRunning" style="max-width: 80px; display: inline-block;" class="me-3" />
+            <CFormLabel for="rapid-limit" class="d-inline me-2">Batas:</CFormLabel>
+            <CFormInput id="rapid-limit" type="number" v-model.number="rapidCollectLimit" min="1" :disabled="isAnyCaptureRunning" style="max-width: 80px; display: inline-block;" />
+          </div>
+          <CButton color="info" @click="startRapidCollect" :disabled="isAnyCaptureRunning" style="color: white;">
+            Mulai Rapid Collect
+          </CButton>
+          <CButton :color="isRapidCollecting ? 'danger' : 'dark'" @click="stopRapidCollect" :disabled="!isRapidCollecting" class="ms-2" style="color: white;">
+            Hentikan
+          </CButton>
+        </CTabPane>
+      </CTabContent>
+    </CModalBody>
+    <CModalFooter>
+      <CButton color="secondary" @click="closeCaptureModal">Tutup</CButton>
+    </CModalFooter>
+  </CModal>
 
-    <CCard v-if="capturedImages.length > 0" class="mt-4">
-      <CCardHeader>
-        <CRow class="align-items-center">
-          <CCol>
-            <strong>Galeri Gambar ({{ capturedImages.length }} gambar)</strong>
-          </CCol>
-          <CCol class="text-end">
-            <CButton color="primary" size="sm" @click="openSaveModal" class="me-2">
-              Save All
-            </CButton>
-            <CButton color="secondary" size="sm" @click="clearImages">
-              Bersihkan Galeri
-            </CButton>
-          </CCol>
-        </CRow>
-      </CCardHeader>
-      <CCardBody>
-        <CRow class="image-gallery g-3">
-          <CCol v-for="(image, index) in capturedImages" :key="index" xs="6" sm="4" md="3" lg="2">
-            <div class="image-container">
-              <img :src="image" alt="Gambar hasil tangkapan" class="captured-image" />
-              <CButton color="danger" size="sm" class="delete-btn" @click="deleteImage(index)">
-                <CIcon name="cil-trash" />
-              </CButton>
-            </div>
-          </CCol>
-        </CRow>
-      </CCardBody>
-    </CCard>
-
-    <canvas ref="canvasElement" style="display: none;"></canvas>
-
-    <CModal :visible="isSaveModalVisible" @close="closeSaveModal">
-      <CModalHeader>
-        <CModalTitle>Save All Images</CModalTitle>
-      </CModalHeader>
-      <CModalBody>
-        <div class="mb-3">
-          <CFormLabel for="name-input">Nama Format</CFormLabel>
-          <CFormInput id="name-input" v-model="saveName" />
-        </div>
-        <div class="mb-3">
-          <CFormLabel for="save-option">Opsi Simpan</CFormLabel>
-          <CFormSelect id="save-option" v-model="saveOption" :options="['default', 'new']" />
-        </div>
-        <div v-if="saveOption === 'new'" class="mb-3">
-          <CFormLabel for="new-folder-name">Nama Folder Baru</CFormLabel>
-          <CFormInput id="new-folder-name" v-model="newFolderName" />
-        </div>
-      </CModalBody>
-      <CModalFooter>
-        <CButton color="secondary" @click="closeSaveModal">Cancel</CButton>
-        <CButton color="primary" @click="saveAllImages">Save</CButton>
-      </CModalFooter>
-    </CModal>
-  </CContainer>
+  <CModal :visible="isSaveModalVisible" @close="closeSaveModal">
+    <CModalHeader>
+      <CModalTitle>Save All Images</CModalTitle>
+    </CModalHeader>
+    <CModalBody>
+      <div class="mb-3">
+        <CFormLabel for="name-input">Nama Format</CFormLabel>
+        <CFormInput id="name-input" v-model="saveName" />
+      </div>
+      <div class="mb-3">
+        <CFormLabel for="save-option">Opsi Simpan</CFormLabel>
+        <CFormSelect id="save-option" v-model="saveOption" :options="['default', 'new']" />
+      </div>
+      <div v-if="saveOption === 'new'" class="mb-3">
+        <CFormLabel for="new-folder-name">Nama Folder Baru</CFormLabel>
+        <CFormInput id="new-folder-name" v-model="newFolderName" />
+      </div>
+    </CModalBody>
+    <CModalFooter>
+      <CButton color="secondary" @click="closeSaveModal">Cancel</CButton>
+      <CButton color="primary" @click="saveAllImages">Save</CButton>
+    </CModalFooter>
+  </CModal>
 </template>
 
 <script>
 import { 
   CContainer, CRow, CCol, CButton, CAlert, CFormLabel, CFormSelect, 
   CFormInput, CCard, CCardBody, CCardTitle, CCardText, CCardHeader,
-  CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter
+  CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
+  CNav, CNavItem, CNavLink, CTabContent, CTabPane
 } from '@coreui/vue';
 import { CIcon } from '@coreui/icons-vue';
+import api from '../apis/CommonAPI';
 
 export default {
 
@@ -169,16 +187,16 @@ export default {
     CContainer, CRow, CCol, CButton, CAlert, CFormLabel, CFormSelect, 
     CFormInput, CCard, CCardBody, CCardTitle, CCardText, CCardHeader,
     CIcon,
-    CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter
+    CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter,
+    CNav, CNavItem, CNavLink, CTabContent, CTabPane
   },
   
   data() {
     return {
-      isCameraSupported: 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices,
       cameras: [],
-      selectedDeviceId: null,
-      stream: null,
-      isCameraRunning: false,
+      rawCameras: [],
+      selectedCamera: null,
+      streamUrl: null,
       capturedImages: [],
       
       // Interval Capture Data
@@ -197,13 +215,17 @@ export default {
       saveName: '',
       saveOption: 'default',
       newFolderName: '',
+
+      // Feature Modals
+      isCaptureModalVisible: false,
+      activeTab: 'manual',
     };
   },
   computed: {
     cameraOptions() {
-      return this.cameras.map(camera => ({
-        value: camera.deviceId,
-        label: camera.label || `Kamera ${camera.deviceId.substring(0, 6)}`
+      return this.cameras.map(cam => ({
+        value: cam.value,
+        label: cam.label
       }));
     },
     isAnyCaptureRunning() {
@@ -211,69 +233,66 @@ export default {
     }
   },
   mounted() {
-    if (this.isCameraSupported) {
-      this.loadCameras();
-    }
+    this.fetchCameraList();
   },
   beforeDestroy() {
     this.stopCamera();
   },
   methods: {
-    async loadCameras() {
+    async fetchCameraList() {
       try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        this.cameras = devices.filter(device => device.kind === 'videoinput');
+        const response = await api.get('/camData/get');
+        const responseData = response.data;
+        this.rawCameras = Array.isArray(responseData) ? responseData : [];
+
+        this.cameras = this.rawCameras.map(cam => ({
+          label: cam.cam_nm,
+          value: cam.cam_id
+        }));
+
         if (this.cameras.length > 0) {
-          this.selectedDeviceId = this.cameras[0].deviceId;
-          this.startCamera();
-        } else {
-          console.warn('Tidak ada kamera yang ditemukan.');
+          // Default ke kamera pertama jika belum ada yang dipilih
+          if (!this.selectedCamera) {
+            this.selectedCamera = this.cameras[0].value;
+            this.startCamera();
+          }
         }
       } catch (error) {
-        console.error('Error saat memuat daftar kamera:', error);
+        console.error('Error fetching camera list:', error);
       }
     },
-    async startCamera() {
-      this.stopCamera();
-      if (!this.selectedDeviceId) return;
-
-      const constraints = { video: { deviceId: { exact: this.selectedDeviceId } } };
-
-      try {
-        this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-        this.$refs.videoPlayer.srcObject = this.stream;
-        this.isCameraRunning = true;
-      } catch (error) {
-        console.error('Error saat memulai kamera:', error);
-        this.isCameraRunning = false;
-      }
+    startCamera() {
+      // Menggunakan stream dari backend
+      const camIndex = this.selectedCamera ? this.selectedCamera : 0;
+      // Tambahkan timestamp untuk mencegah caching
+      this.streamUrl = `/camera/stream?index=${camIndex}&t=${new Date().getTime()}`;
+    },
+    handleCameraChange() {
+      this.startCamera();
     },
     stopCamera() {
       this.stopIntervalCapture();
       this.stopRapidCollect();
-      if (this.stream) {
-        this.stream.getTracks().forEach(track => track.stop());
-      }
-      this.isCameraRunning = false;
-      if (this.$refs.videoPlayer) {
-        this.$refs.videoPlayer.srcObject = null;
-      }
-      this.stream = null;
+      this.streamUrl = null;
     },
-    takePicture() {
-      if (!this.isCameraRunning) return;
-
-      const video = this.$refs.videoPlayer;
-      const canvas = this.$refs.canvasElement;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const context = canvas.getContext('2d');
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      this.capturedImages.unshift(canvas.toDataURL('image/png'));
+    async takePicture() {
+      try {
+        // Mengambil snapshot dari backend endpoint
+        const response = await api.get('/camera/snapshot', { responseType: 'blob' });
+        const imageUrl = URL.createObjectURL(response.data);
+        
+        // Konversi blob ke base64 agar konsisten dengan logika penyimpanan yang ada
+        const reader = new FileReader();
+        reader.readAsDataURL(response.data);
+        reader.onloadend = () => {
+            this.capturedImages.unshift(reader.result);
+        };
+      } catch (error) {
+        console.error('Gagal mengambil snapshot:', error);
+      }
     },
     startIntervalCapture() {
-      if (this.isAnyCaptureRunning || !this.isCameraRunning) return;
+      if (this.isAnyCaptureRunning) return;
       
       this.isIntervalRunning = true;
       this.takePicture(); 
@@ -287,13 +306,13 @@ export default {
       this.isIntervalRunning = false;
     },
     startRapidCollect() {
-      if (this.isAnyCaptureRunning || !this.isCameraRunning) return;
+      if (this.isAnyCaptureRunning) return;
 
       this.isRapidCollecting = true;
       let captureCount = 0;
 
       this.rapidIntervalId = setInterval(() => {
-        if (captureCount >= this.rapidCollectLimit || !this.isCameraRunning) {
+        if (captureCount >= this.rapidCollectLimit) {
           this.stopRapidCollect();
           return;
         }
@@ -331,18 +350,27 @@ export default {
         return;
       }
 
-      this.capturedImages.forEach((image, index) => {
-        const link = document.createElement('a');
-        const sanitizedName = this.saveName.replace(/[^a-zA-Z0-9-]/g, '_');
-        link.download = `${sanitizedName}-${index + 1}.png`;
-        link.href = image;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      });
+      const payload = {
+        saveName: this.saveName,
+        saveOption: this.saveOption,
+        newFolderName: this.newFolderName,
+        images: this.capturedImages
+      };
 
-      this.closeSaveModal();
+      api.post('/camera/save-samples', payload)
+        .then(response => {
+          alert(response.data.message);
+          this.closeSaveModal();
+          // Opsional: Bersihkan galeri setelah sukses disimpan
+          // this.clearImages();
+        })
+        .catch(error => {
+          console.error('Gagal menyimpan gambar:', error);
+          alert('Gagal menyimpan gambar ke server.');
+        });
     },
+    openCaptureModal() { this.isCaptureModalVisible = true; },
+    closeCaptureModal() { this.isCaptureModalVisible = false; },
   },
 };
 </script>

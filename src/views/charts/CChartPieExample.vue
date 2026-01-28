@@ -2,6 +2,7 @@
   <CChartPie :data="defaultData" />
 </template>
 
+
 <script>
 import { CChartPie } from '@coreui/vue-chartjs'
 export default {
